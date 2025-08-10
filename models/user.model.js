@@ -4277,7 +4277,23 @@ const userSchema = new Schema({
     },
     refreshToken:{
         type:String
-    }
+    },
+    exp:{
+        type:Number,
+        default : 0
+    },
+    rank: {
+    type: String,
+    enum: [
+      'E-Rank',
+      'D-Rank',
+      'C-Rank',
+      'B-Rank',
+      'A-Rank',
+      'S-Rank',
+    ],
+    default:'E-Rank'
+  },
 },{timestamps:true})
 
 userSchema.pre("save",async function(next) {

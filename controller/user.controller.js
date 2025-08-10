@@ -94,6 +94,20 @@ const userLogout = async(req,res)=>{
         "User logged OUT"
     )
 }
+const userProfile = async(req,res) =>{
+    const userId = req.user?._id;
+    if(!userId){
+        return res.status(402).json({message:"Unauthorised"});
+    }
+    try {
+        const userProfile = await User.findById(userId).select("-refreshToken -password");
+        return res.status(201).json({message:"Success",userProfile})
+        
+    } catch (error) {
+        console.log(error);
+        return res.status(400).json({message:"Something went Wrong!"})
+    }
+}
 const authStatus = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -109,4 +123,4 @@ const authStatus = async (req, res) => {
   }
 };
 
-export { checkWorking, userLogin, registerUser,userLogout,authStatus }
+export { checkWorking, userLogin, registerUser,userLogout,authStatus,userProfile }
