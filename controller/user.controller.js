@@ -108,6 +108,70 @@ const userProfile = async(req,res) =>{
         return res.status(400).json({message:"Something went Wrong!"})
     }
 }
+const updateProgress = async (req, res) => {
+  const userId = req.user?._id;
+  const { topicName, problemName, done,xpChange } = req.body;
+
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    // 1️⃣ Get current Done value from DB
+    const user = await User.findOne(
+      { _id: userId, "progress.topicName": topicName },
+      { "progress.$": 1 } // only matched topic
+    );
+
+    if (!user || !user.progress.length) {
+      return res.status(404).json({ message: "Topic not found" });
+    }
+
+    // Find the specific question
+    const topic = user.progress[0];
+    const question = topic.questions.find(q => q.Problem === problemName);
+
+    if (!question) {
+      return res.status(404).json({ message: "Question not found" });
+    }
+
+    // 2️⃣ If same value → skip
+    if (question.Done === done) {
+      return res.status(200).json({ message: "No change needed" });
+    }
+    const updateOps = {
+  $set: {
+    "progress.$[topic].questions.$[q].Done": done
+  },
+  ...(done
+    ? { $inc: { "progress.$[topic].doneQuestions": 1, exp: xpChange } }
+    : { $inc: { "progress.$[topic].doneQuestions": -1, exp: xpChange } }),
+};
+
+    // 4️⃣ Update DB
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateOps,
+      {
+        arrayFilters: [
+          { "topic.topicName": topicName },
+          { "q.Problem": problemName }
+        ],
+        new: true
+      }
+    );
+
+    res.json({
+      message: "Progress updated successfully",
+      updatedUser
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Error updating progress", error });
+  }
+
+};
+
 const authStatus = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -123,4 +187,79 @@ const authStatus = async (req, res) => {
   }
 };
 
-export { checkWorking, userLogin, registerUser,userLogout,authStatus,userProfile }
+const leaderboard = async(req,res)=>{
+    try {
+    const leaderboard = await User.find({}, { fullName: 1, exp: 1, _id: 0 })
+      .sort({ exp: -1 }) // highest XP first
+      .limit(20); // top 20 players
+    res.json(leaderboard);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching leaderboard" });
+  }
+}
+
+import dotenv from "dotenv"
+dotenv.config({
+    path:"../.env"
+})
+// controller/user.controller.js
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// Init Gemini client
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+// Retry helper
+async function retryWithBackoff(fn, retries = 3, delay = 1000) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (retries > 0 && err.status === 503) {
+      console.warn(`Model overloaded, retrying in ${delay}ms...`);
+      await new Promise(res => setTimeout(res, delay));
+      return retryWithBackoff(fn, retries - 1, delay * 2);
+    }
+    throw err;
+  }
+}
+
+// Controller
+const getHelp = async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: "Problem URL is required" });
+    }
+
+    const prompt = `
+I have a coding problem here: ${url}
+Please explain step-by-step how to approach and solve it.
+Include:
+1. How to understand the problem
+2. A possible step-by-step solution plan
+3. Time complexity analysis
+4. Space complexity analysis
+Format your answer in Markdown.
+    `;
+
+    const result = await retryWithBackoff(() =>
+      model.generateContent(prompt)
+    );
+
+    const explanation = result.response.text();
+    res.json({ explanation });
+
+  } catch (err) {
+    console.error("Error in getHelp:", err);
+    res.status(err.status === 503 ? 503 : 500).json({
+      error:
+        err.status === 503
+          ? "AI service is overloaded. Please try again in a few seconds."
+          : "Something went wrong while fetching AI help.",
+    });
+  }
+};
+
+
+
+export { checkWorking, userLogin, registerUser,userLogout,authStatus,userProfile,updateProgress,leaderboard ,getHelp}
