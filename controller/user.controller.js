@@ -66,6 +66,8 @@ const registerUser = async (req, res) => {
 }
 const generateTokens = async (userId) => {
     const user = await User.findById(userId);
+    // console.log(user);
+    
     if (!user) {
         throw new ApiError(500, "Something Went Wrong")
     }
@@ -261,6 +263,4 @@ Format your answer in Markdown.
   }
 };
 
-
-
-export { checkWorking, userLogin, registerUser,userLogout,authStatus,userProfile,updateProgress,leaderboard ,getHelp}
+export { checkWorking, userLogin, registerUser,userLogout,authStatus,userProfile,updateProgress,leaderboard ,getHelp,generateTokens}

@@ -1,13 +1,8 @@
 import './config/env.js'
+import './config/passport.js'
 import { connectDb } from "./db/connectDb.js";
 import { app } from "./app.js";
 
-// // Load .env from Backend/.env
-// dotenv.config({
-//   path: path.resolve("./.env"),
-// });
-
-// ✅ Verify required environment variables
 const requiredEnv = ["PORT", "GEMINI_API_KEY"];
 const missingEnv = requiredEnv.filter((key) => !process.env[key]);
 
