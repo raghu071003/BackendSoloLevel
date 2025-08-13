@@ -1,6 +1,7 @@
 const checkWorking = (req, res) => {
     return res.send("Hello")
 }
+
 import bcrypt from 'bcrypt'
 import { User } from "../models/user.model.js";
 import { options } from '../constants.js';
@@ -198,15 +199,14 @@ const leaderboard = async(req,res)=>{
   }
 }
 
-import dotenv from "dotenv"
-dotenv.config({
-    path:"../.env"
-})
+
 // controller/user.controller.js
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Init Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// console.log(process.env.GEMINI_API_KEY);
+
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // Retry helper
@@ -234,6 +234,7 @@ const getHelp = async (req, res) => {
     const prompt = `
 I have a coding problem here: ${url}
 Please explain step-by-step how to approach and solve it.
+Dont give the code 
 Include:
 1. How to understand the problem
 2. A possible step-by-step solution plan
