@@ -1,5 +1,5 @@
 export const options ={
     httpOnly:true,
-    secure:true,
+    secure: process.env.Prod === true,
     sameSite: 'None',
 }
