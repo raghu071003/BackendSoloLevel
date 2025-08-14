@@ -1,6 +1,6 @@
 import './config/env.js'
 import './config/passport.js'
-import { connectDb } from "./db/connectDb.js";
+import { connectDb } from "./db/connectDB.js";
 import { app } from "./app.js";
 
 const requiredEnv = ["PORT", "GEMINI_API_KEY"];
