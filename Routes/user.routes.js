@@ -1,5 +1,5 @@
 import {Router} from 'express'
-import { authStatus, checkWorking, generateTokens, getHelp, leaderboard, registerUser, updateProgress, userLogin, userLogout, userProfile } from '../controller/user.controller.js';
+import { authStatus, checkWorking, generateTokens, getHelp, getProgress, leaderboard, registerUser, updateProgress, userLogin, userLogout, userProfile } from '../controller/user.controller.js';
 import { verifyJwt } from '../Middleware/auth.middleware.js';
 import jwt from 'jsonwebtoken'
 import passport from 'passport';
@@ -11,6 +11,7 @@ router.route('/signup').post(registerUser)
 router.route('/login').post(userLogin)
 router.route('/logout').post(verifyJwt, userLogout)
 router.route('/authStatus').post(verifyJwt,authStatus);
+router.route('/getProgress').post(verifyJwt,getProgress);
 router.route('/profile').post(verifyJwt,userProfile)
 router.route('/updateProgress').post(verifyJwt,updateProgress);
 router.route('/leaderboard').post(verifyJwt,leaderboard);
@@ -23,7 +24,6 @@ router.get("/auth/google/callback",
   async(req, res) => {
     // Successful authentication
 
-    console.log(req.user);
     
     const {accessToken,refreshToken} = await generateTokens(req.user._id )
     res.cookie("accessToken", accessToken, options);

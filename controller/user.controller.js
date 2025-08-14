@@ -45,10 +45,13 @@ const registerUser = async (req, res) => {
         if (existedUser) {
             return res.status(409).json("User aldready exists!")
         }
+        const progressDoc = await Progress.create({});
+        
         const user = await User.create({
             email: email,
             fullName: fullName,
             password: password,
+            progress:progressDoc._id,
         })
         const createdUser = await User.findById(user._id).select(
             "-password -refreshToken"
@@ -111,69 +114,98 @@ const userProfile = async(req,res) =>{
         return res.status(400).json({message:"Something went Wrong!"})
     }
 }
+const getProgress = async(req,res)=>{
+  const userId = req.user._id;
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  try {
+    const user = await User.findById(userId).select("progress");
+    if (!user || !user.progress) {
+      return res.status(404).json({ message: "Progress not found" });
+    }
+    const progressDoc = await Progress.findById(user.progress);
+    if (!progressDoc) {
+      return res.status(404).json({ message: "Progress document missing" });
+    }
+    return res.status(201).json({message:"Fetched!",progress:progressDoc.progress})
+  } catch (error) {
+    console.error("Error fetching progress",error);
+    res.status(500).json({message:"Something went wrong!"});
+    
+  }
+}
 const updateProgress = async (req, res) => {
   const userId = req.user?._id;
-  const { topicName, problemName, done,xpChange } = req.body;
+  const { topicName, problemName, done, xpChange } = req.body;
 
   if (!userId) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
-    // 1️⃣ Get current Done value from DB
-    const user = await User.findOne(
-      { _id: userId, "progress.topicName": topicName },
-      { "progress.$": 1 } // only matched topic
-    );
+    // Get the user with progress ID
+    const user = await User.findById(userId).select("progress exp");
+    if (!user || !user.progress) {
+      return res.status(404).json({ message: "Progress not found" });
+    }
 
-    if (!user || !user.progress.length) {
+    // Fetch the actual progress document
+    const progressDoc = await Progress.findById(user.progress);
+    if (!progressDoc) {
+      return res.status(404).json({ message: "Progress document missing" });
+    }
+
+    // Find topic
+    const topic = progressDoc.progress.find(t => t.topicName === topicName);
+    if (!topic) {
       return res.status(404).json({ message: "Topic not found" });
     }
 
-    // Find the specific question
-    const topic = user.progress[0];
+    // Find question
     const question = topic.questions.find(q => q.Problem === problemName);
-
     if (!question) {
       return res.status(404).json({ message: "Question not found" });
     }
 
-    // 2️⃣ If same value → skip
+    // Skip if same value
     if (question.Done === done) {
       return res.status(200).json({ message: "No change needed" });
     }
-    const updateOps = {
-  $set: {
-    "progress.$[topic].questions.$[q].Done": done
-  },
-  ...(done
-    ? { $inc: { "progress.$[topic].doneQuestions": 1, exp: xpChange } }
-    : { $inc: { "progress.$[topic].doneQuestions": -1, exp: xpChange } }),
-};
 
-    // 4️⃣ Update DB
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      updateOps,
-      {
-        arrayFilters: [
-          { "topic.topicName": topicName },
-          { "q.Problem": problemName }
-        ],
-        new: true
-      }
-    );
+    // Update question status
+    question.Done = done;
+    topic.doneQuestions += done ? 1 : -1;
+    if(topic.doneQuestions >= 0){
+      topic.started = true
+    }else{
+      topic.started = false;
+    }
+
+    // Mark as modified so Mongoose saves it
+    progressDoc.markModified("progress");
+
+    // Update XP in user doc
+    user.exp += xpChange;
+
+    // Save both
+    await progressDoc.save();
+    await user.save();
 
     res.json({
       message: "Progress updated successfully",
-      updatedUser
+      updatedExp: user.exp
     });
 
   } catch (error) {
+    console.error("Error updating progress:", error);
     res.status(500).json({ message: "Error updating progress", error });
   }
-
 };
+
+
+
+
 
 const authStatus = async (req, res) => {
   try {
@@ -188,7 +220,7 @@ const authStatus = async (req, res) => {
     console.error('authStatus error:', error);
     return res.status(500).json({ authenticated: false, message: 'Server error' });
   }
-};
+};  
 
 const leaderboard = async(req,res)=>{
     try {
@@ -204,6 +236,7 @@ const leaderboard = async(req,res)=>{
 
 // controller/user.controller.js
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Progress } from '../models/progress.model.js';
 
 // Init Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -263,4 +296,4 @@ Format your answer in Markdown.
   }
 };
 
-export { checkWorking, userLogin, registerUser,userLogout,authStatus,userProfile,updateProgress,leaderboard ,getHelp,generateTokens}
+export { checkWorking, userLogin, registerUser,userLogout,authStatus,userProfile,updateProgress,leaderboard ,getHelp,generateTokens,getProgress}
